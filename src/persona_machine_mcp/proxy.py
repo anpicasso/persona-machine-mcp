@@ -45,19 +45,32 @@ def tool_exposed(name: str, settings: Settings) -> bool:
     return allowed and not denied
 
 
-async def collect_tools(upstream: ClientSession) -> list[types.Tool]:
-    tools: list[types.Tool] = []
+async def _collect_pages(fetch, attr: str, what: str) -> list:
+    """Follow ``nextCursor`` until exhausted; refuse a repeated cursor (upstream loop)."""
+    items: list = []
     cursor: str | None = None
     seen: set[str] = set()
     while True:
-        page = await upstream.list_tools(cursor=cursor)
-        tools.extend(page.tools)
+        page = await fetch(cursor=cursor)
+        items.extend(getattr(page, attr))
         cursor = page.nextCursor
         if not cursor:
-            return tools
+            return items
         if cursor in seen:
-            raise UpstreamError("Upstream returned a repeated tool pagination cursor")
+            raise UpstreamError(f"Upstream returned a repeated {what} pagination cursor")
         seen.add(cursor)
+
+
+async def collect_tools(upstream: ClientSession) -> list[types.Tool]:
+    return await _collect_pages(upstream.list_tools, "tools", "tool")
+
+
+async def collect_resources(upstream: ClientSession) -> list[types.Resource]:
+    return await _collect_pages(upstream.list_resources, "resources", "resource")
+
+
+async def collect_prompts(upstream: ClientSession) -> list[types.Prompt]:
+    return await _collect_pages(upstream.list_prompts, "prompts", "prompt")
 
 
 def create_server(
@@ -97,7 +110,7 @@ def create_server(
 
         @server.list_resources()
         async def list_resources() -> list[types.Resource]:
-            return (await upstream.list_resources()).resources
+            return await collect_resources(upstream)
 
         # The read_resource convenience decorator rebuilds contents (and their URIs).
         # Return the protocol result directly to preserve text/blob, MIME and metadata.
@@ -110,7 +123,7 @@ def create_server(
 
         @server.list_prompts()
         async def list_prompts() -> list[types.Prompt]:
-            return (await upstream.list_prompts()).prompts
+            return await collect_prompts(upstream)
 
         @server.get_prompt()
         async def get_prompt(name: str, arguments: dict[str, str] | None) -> types.GetPromptResult:
@@ -120,7 +133,9 @@ def create_server(
 
 
 @asynccontextmanager
-async def _upstream(settings: Settings, auth: httpx.Auth | None):
+async def _upstream(settings: Settings, auth: httpx.Auth | None, *, http_client_factory=None):
+    """``http_client_factory`` lets tests inject an httpx transport; None = SDK default."""
+    extra = {"httpx_client_factory": http_client_factory} if http_client_factory else {}
     try:
         # MCP 1.30 deprecated this name, but it is the shared API back to 1.12.
         # Suppress only its rename warning while constructing the context manager;
@@ -131,7 +146,7 @@ async def _upstream(settings: Settings, auth: httpx.Auth | None):
                 message=r"Use `streamable_http_client` instead\.",
                 category=DeprecationWarning,
             )
-            connection = streamablehttp_client(settings.mcp_url, auth=auth)
+            connection = streamablehttp_client(settings.mcp_url, auth=auth, **extra)
         async with connection as (read, write, _):
             async with ClientSession(read, write) as upstream:
                 initialized = await upstream.initialize()
@@ -162,10 +177,12 @@ class CheckResult:
     total: int
 
 
-async def check(settings: Settings) -> CheckResult:
+async def check(settings: Settings, *, http_client_factory=None) -> CheckResult:
     minter = make_minter(settings, resource=settings.mcp_url)
     await minter.get()
-    async with _upstream(settings, PersonaAuth(minter)) as (upstream, caps):
+    async with _upstream(
+        settings, PersonaAuth(minter), http_client_factory=http_client_factory
+    ) as (upstream, caps):
         tools = await collect_tools(upstream) if caps.tools is not None else []
         return CheckResult(
             tools=[tool for tool in tools if tool_exposed(tool.name, settings)], total=len(tools)

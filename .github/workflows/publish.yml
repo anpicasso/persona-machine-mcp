@@ -20,7 +20,7 @@ jobs:
       - name: Verify tag matches package version
         env:
           RELEASE_TAG: ${{ github.ref_name }}
-        run: uv run python -c 'import os; from persona_machine_mcp import __version__; assert os.environ["RELEASE_TAG"] == "v" + __version__'
+        run: uv run --frozen python -c 'import os; from persona_machine_mcp import __version__; assert os.environ["RELEASE_TAG"] == "v" + __version__'
       - run: uv run --frozen ruff check .
       - run: uv run --frozen python -X dev -m pytest -q
       - run: uv build

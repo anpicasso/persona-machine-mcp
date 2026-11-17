@@ -22,8 +22,13 @@ from .keys import (
     write_keypair,
     write_private_file,
 )
+from .redaction import install_stderr_logging
 
 log = logging.getLogger(__name__)
+
+_LIST_OPTIONS = ("tools", "exclude_tools")
+_SCALAR_OPTIONS = ("home", "client_id", "key", "mcp_url", "token_url", "scope", "log_level")
+_SUB_SUFFIX = "__sub"
 
 
 class Parser(argparse.ArgumentParser):
@@ -31,19 +36,23 @@ class Parser(argparse.ArgumentParser):
         raise ValueError(message)
 
 
-def _common(parser: argparse.ArgumentParser) -> None:
-    for flag, help_text in (
-        ("--home", "Configuration directory"),
-        ("--client-id", "Persona machine client id (oac_...)"),
-        ("--key", "Private PEM key path"),
-        ("--mcp-url", "Upstream Streamable HTTP endpoint"),
-        ("--token-url", "OAuth token endpoint"),
-        ("--scope", "Space-separated subset of client scopes"),
-        ("--log-level", "DEBUG, INFO, WARNING, ERROR, or CRITICAL"),
+def _common(parser: argparse.ArgumentParser, *, suffix: str = "") -> None:
+    """Shared options; accepted before and after the command. The subcommand parser writes to
+    ``<dest>__sub`` so repeated list options placed on both sides are *merged* by ``_merge_args``
+    (argparse would otherwise let the subparser namespace overwrite the root values)."""
+    for flag, dest, help_text in (
+        ("--home", "home", "Configuration directory"),
+        ("--client-id", "client_id", "Persona machine client id (oac_...)"),
+        ("--key", "key", "Private PEM key path"),
+        ("--mcp-url", "mcp_url", "Upstream Streamable HTTP endpoint"),
+        ("--token-url", "token_url", "OAuth token endpoint"),
+        ("--scope", "scope", "Space-separated subset of client scopes"),
+        ("--log-level", "log_level", "DEBUG, INFO, WARNING, ERROR, or CRITICAL"),
     ):
-        parser.add_argument(flag, default=argparse.SUPPRESS, help=help_text)
+        parser.add_argument(flag, dest=dest + suffix, default=argparse.SUPPRESS, help=help_text)
     parser.add_argument(
         "--tools",
+        dest="tools" + suffix,
         action="append",
         default=argparse.SUPPRESS,
         metavar="GLOB",
@@ -51,11 +60,28 @@ def _common(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--exclude-tools",
+        dest="exclude_tools" + suffix,
         action="append",
         default=argparse.SUPPRESS,
         metavar="GLOB",
         help="Hide matching tools after allow-list (repeatable)",
     )
+
+
+def _merge_args(args: argparse.Namespace) -> argparse.Namespace:
+    """Fold ``<dest>__sub`` values into ``<dest>``: lists concatenate (root first), scalars
+    placed after the command win."""
+    for name in _LIST_OPTIONS:
+        sub = getattr(args, name + _SUB_SUFFIX, None)
+        if sub is not None:
+            setattr(args, name, [*getattr(args, name, []), *sub])
+            delattr(args, name + _SUB_SUFFIX)
+    for name in _SCALAR_OPTIONS:
+        sub = getattr(args, name + _SUB_SUFFIX, None)
+        if sub is not None:
+            setattr(args, name, sub)
+            delattr(args, name + _SUB_SUFFIX)
+    return args
 
 
 def build_parser() -> Parser:
@@ -74,7 +100,7 @@ def build_parser() -> Parser:
     }
     for name, help_text in descriptions.items():
         child = commands.add_parser(name, help=help_text, description=help_text)
-        _common(child)
+        _common(child, suffix=_SUB_SUFFIX)
         if name == "keygen":
             child.add_argument("--alg", choices=("ec", "rsa"), default="ec")
             child.add_argument("--bits", choices=(2048, 3072, 4096), type=int, default=2048)
@@ -159,15 +185,14 @@ def _dispatch(args: argparse.Namespace, settings: Settings) -> None:
         )
 
 
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    return _merge_args(build_parser().parse_args(argv))
+
+
 def main(argv: list[str] | None = None) -> int:
-    logging.basicConfig(
-        stream=sys.stderr,
-        level=logging.INFO,
-        format="persona-machine-mcp %(levelname)s %(message)s",
-    )
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    install_stderr_logging(logging.INFO)
     try:
-        args = build_parser().parse_args(argv)
+        args = parse_args(argv)
         settings = resolve(args, os.environ)
         logging.getLogger().setLevel(settings.log_level)
         _dispatch(args, settings)

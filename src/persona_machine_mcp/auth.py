@@ -13,6 +13,7 @@ import jwt
 
 from .config import validate_client_id
 from .keys import load_private_key
+from .redaction import register_secret
 
 ASSERTION_TTL_S = 300
 REFRESH_SKEW_S = 90
@@ -45,6 +46,7 @@ class TokenMinter:
         self.resource = resource
         self.scope = scope
         self._key, self.alg = load_private_key(pem)
+        register_secret(pem)
         self._transport = transport
         self._token: str | None = None
         self._expires_at = 0.0
@@ -52,7 +54,7 @@ class TokenMinter:
 
     def _assertion(self) -> str:
         now = int(time.time())
-        return jwt.encode(
+        assertion = jwt.encode(
             {
                 "iss": self.client_id,
                 "sub": self.client_id,
@@ -64,6 +66,8 @@ class TokenMinter:
             self._key,
             algorithm=self.alg,
         )
+        register_secret(assertion)
+        return assertion
 
     async def get(self, *, force: bool = False) -> str:
         async with self._lock:
@@ -104,6 +108,7 @@ class TokenMinter:
                     raise ValueError
             except (KeyError, TypeError, ValueError, OverflowError):
                 raise TokenError("http_200") from None
+            register_secret(token)
             self._token = token
             self._expires_at = time.time() + ttl
             log.info("minted access token (alg=%s, expires_in=%ss)", self.alg, ttl)
