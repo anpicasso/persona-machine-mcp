@@ -2,7 +2,9 @@
 
 Portable [Agent Plugins v1](https://agent-plugins.org/) package. Unofficial; not affiliated with
 Persona. Provides the `persona` stdio MCP server and a setup/rotation skill. Requires `uvx` on the
-host PATH and a released `persona-machine-mcp==0.1.0` on PyPI.
+host PATH. The server runs `uvx --from git+https://github.com/anpicasso/persona-machine-mcp@main
+persona-machine-mcp` (no PyPI release yet); after the first PyPI release the argument becomes
+`persona-machine-mcp==<version>`.
 
 Complete [the package quickstart](../README.md#quickstart) before enabling. Credentials are read
 from the normal configuration home; no secrets are stored in these manifests.

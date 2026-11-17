@@ -15,9 +15,17 @@ The MCP host sees an ordinary stdio server; it does not store or refresh bearer 
 ## Quickstart
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and ensure `uvx` is on your
-host application's PATH. The following `uvx` commands require the package's PyPI release. From
-an unpublished checkout, use `uv sync` and replace `uvx persona-machine-mcp` with
-`uv run persona-machine-mcp`.
+host application's PATH.
+
+**Until the first PyPI release**, run straight from GitHub by replacing every
+`uvx persona-machine-mcp` below with:
+
+```sh
+uvx --from git+https://github.com/anpicasso/persona-machine-mcp persona-machine-mcp
+```
+
+(pin a tag or commit with `@v0.1.0` / `@<sha>` for reproducibility). From a local checkout use
+`uv sync` and `uv run persona-machine-mcp`.
 
 ```sh
 uvx persona-machine-mcp keygen
@@ -101,12 +109,13 @@ command = "uvx"
 args = ["persona-machine-mcp"]
 ```
 
-Pin the argument to `persona-machine-mcp==0.1.0` where reproducibility is important.
+Pin the argument to `persona-machine-mcp==<version>` (PyPI) or `--from git+https://github.com/anpicasso/persona-machine-mcp@<tag-or-sha>` where reproducibility is important.
 
 ### Hermes Agent Plugin
 
 The portable Agent Plugins v1 package is **`agent-plugin/`**, not this repository's root. It
-bundles the `persona` MCP entry pinned to `0.1.0` and a setup/rotation skill. From a reviewed
+bundles the `persona` MCP entry (currently `uvx --from git+…@main`, switching to a PyPI pin after
+the first release) and a setup/rotation skill. From a reviewed
 checkout, with a fresh destination:
 
 ```sh

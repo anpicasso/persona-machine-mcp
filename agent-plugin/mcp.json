@@ -4,7 +4,11 @@
     "persona": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["persona-machine-mcp==0.1.0"]
+      "args": [
+        "--from",
+        "git+https://github.com/anpicasso/persona-machine-mcp@main",
+        "persona-machine-mcp"
+      ]
     }
   }
 }
