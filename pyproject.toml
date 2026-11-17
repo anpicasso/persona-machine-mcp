@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "persona-machine-mcp"
+dynamic = ["version"]
+description = "Unofficial stdio bridge for Persona MCP V2 machine clients"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{name = "Angello Picasso"}]
+keywords = ["persona", "mcp", "oauth", "machine-client"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+  "mcp>=1.12,<2",
+  "pyjwt>=2.8",
+  "cryptography>=42",
+  "httpx>=0.27",
+  "anyio>=4",
+]
+
+[project.urls]
+Homepage = "https://github.com/anpicasso/persona-machine-mcp"
+Repository = "https://github.com/anpicasso/persona-machine-mcp"
+Issues = "https://github.com/anpicasso/persona-machine-mcp/issues"
+
+[project.scripts]
+persona-machine-mcp = "persona_machine_mcp.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "anyio>=4", "uvicorn>=0.30", "ruff>=0.11"]
+
+[tool.hatch.version]
+path = "src/persona_machine_mcp/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/persona_machine_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]

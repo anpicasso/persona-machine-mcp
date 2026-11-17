@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "persona-machine-mcp",
+  "version": "0.1.0",
+  "description": "Unofficial Persona MCP V2 bridge with unattended machine-client authentication.",
+  "author": {"name": "Angello Picasso", "url": "https://github.com/anpicasso"},
+  "homepage": "https://github.com/anpicasso/persona-machine-mcp",
+  "repository": "https://github.com/anpicasso/persona-machine-mcp",
+  "license": "MIT",
+  "keywords": ["persona", "mcp", "oauth", "machine-client"]
+}
