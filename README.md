@@ -12,6 +12,32 @@ access tokens live about 15 minutes and have **no refresh token**. This bridge c
 in memory, re-mints 90 seconds before expiry, and re-mints/retries **once** after an upstream 401.
 The MCP host sees an ordinary stdio server; it does not store or refresh bearer tokens.
 
+## Why a bridge exists
+
+MCP hosts authenticate to remote servers in one of two ways: a **static header** (an API key or a
+bearer pasted into the config, read once at startup) or the **browser OAuth flow** from the MCP
+authorization spec (authorization code + PKCE, a person signs in, the host stores a refresh token).
+Neither fits a Persona machine client:
+
+- A machine-client access token (`puat_…`) **expires after ~15 minutes and comes with no refresh
+  token**. A static header therefore works for one quarter of an hour and then every call returns
+  401. There is nothing for the host to "refresh": getting a new token means signing a brand-new
+  `private_key_jwt` client assertion with your private key and exchanging it with
+  `grant_type=client_credentials`. No mainstream host (Hermes, Claude Code, Claude Desktop, Cursor,
+  Codex CLI) implements that grant or that re-minting loop.
+- The browser OAuth flow is **person-bound**: it needs someone to sign in, inherits that person's
+  session, and cannot run under a gateway, a cron job or a CI runner. Persona's MCP V2 also does
+  not offer dynamic client registration for arbitrary hosts, so generic host OAuth clients are
+  rejected at the consent step.
+
+So the token lifecycle has to live somewhere between the host and Persona. This package is that
+somewhere: a tiny stdio MCP server that the host launches like any other local server. It keeps
+the private key, signs assertions, mints the short-lived token, re-mints it 90 seconds before
+expiry, retries once on a 401, and proxies tools/resources/prompts to `https://withpersona.com/mcp`
+unchanged. The host never sees a bearer, never has to rotate anything, and keeps working unattended.
+It was first written as a one-file script to get a Hermes gateway talking to Persona with no human
+in the loop, and packaged so any MCP host can reuse it.
+
 ## Quickstart
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and ensure `uvx` is on your
